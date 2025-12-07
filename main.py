@@ -288,6 +288,14 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
         print(f"Step 3: Fetching complete product attributes...")
         step3_start = time.time()
         import urllib.parse
+        
+        # Ensure variant_url is a string before encoding
+        if not isinstance(variant_url, str):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Invalid variant URL type: {type(variant_url)}"
+            )
+        
         encoded_url = urllib.parse.quote(variant_url, safe='')
         
         detail_params = {
