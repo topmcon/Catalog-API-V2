@@ -28,23 +28,79 @@ class FergusonProductRequest(BaseModel):
 class FergusonCompleteLookupRequest(BaseModel):
     model_number: str = Field(..., description="Manufacturer model number")
 
-def find_matching_variant(search_results: dict, model_number: str) -> Optional[str]:
+def generate_model_variations(model_number: str) -> list:
+    """
+    Generate common model number format variations for smart matching.
+    Returns list of possible variations to try.
+    """
+    model = model_number.strip()
+    variations = [model]  # Original
+    
+    # Common brand prefixes
+    prefixes = ["K-", "G-", "M-", "A-"]
+    for prefix in prefixes:
+        if not model.upper().startswith(prefix.upper()):
+            variations.append(f"{prefix}{model}")
+    
+    # Add/remove hyphens
+    if "-" in model:
+        variations.append(model.replace("-", ""))  # Remove all hyphens
+    else:
+        # Try adding hyphens in common positions
+        if len(model) > 4:
+            # Format: G9104BNI -> G-9104-BNI
+            if model[0].isalpha() and model[1:5].isdigit():
+                variations.append(f"{model[0]}-{model[1:5]}-{model[5:]}")
+            # Format: 97621SHP -> 97621-SHP
+            for i in range(2, len(model)-1):
+                if model[i].isalpha() and model[i-1].isdigit():
+                    variations.append(f"{model[:i]}-{model[i:]}")
+                    break
+    
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_variations = []
+    for v in variations:
+        v_upper = v.upper()
+        if v_upper not in seen:
+            seen.add(v_upper)
+            unique_variations.append(v)
+    
+    return unique_variations
+
+def find_matching_variant(search_results: dict, model_number: str, fuzzy: bool = False) -> tuple:
     """
     Find the variant that matches the requested model number.
-    Returns the variant's URL for use in detail lookup.
-    Implements EXACT matching (case-insensitive).
+    Returns tuple: (variant_url, matched_model, match_type)
+    
+    Match types: 'exact', 'variation', 'partial', None
     """
     model_upper = model_number.upper().strip()
+    variations = generate_model_variations(model_number) if fuzzy else [model_number]
     
-    for product in search_results.get("products", []):
-        for variant in product.get("variants", []):
-            variant_model = variant.get("model_no", "").upper().strip()
-            
-            # Exact match (case-insensitive)
-            if variant_model == model_upper:
-                return variant.get("url")
+    # Try exact matches first
+    for variation in variations:
+        variation_upper = variation.upper().strip()
+        for product in search_results.get("products", []):
+            for variant in product.get("variants", []):
+                variant_model = variant.get("model_no", "").upper().strip()
+                
+                # Exact match
+                if variant_model == variation_upper:
+                    match_type = 'exact' if variation == model_number else 'variation'
+                    return (variant.get("url"), variant.get("model_no"), match_type)
     
-    return None
+    # Try partial matches (variant contains search term)
+    if fuzzy:
+        for product in search_results.get("products", []):
+            for variant in product.get("variants", []):
+                variant_model = variant.get("model_no", "").upper().strip()
+                
+                # Partial match - variant contains model number
+                if model_upper in variant_model or variant_model in model_upper:
+                    return (variant.get("url"), variant.get("model_no"), 'partial')
+    
+    return (None, None, None)
 
 @app.get("/health")
 async def health_check():
@@ -183,8 +239,8 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
         
         print(f"Step 1: ✓ Found {len(search_data.get('results', []))} products ({step1_time:.2f}s)")
         
-        # STEP 2: Find matching variant and preserve search data
-        print(f"Step 2: Finding exact variant match for {model_number}...")
+        # STEP 2: Find matching variant with smart format-aware matching
+        print(f"Step 2: Finding variant match for {model_number} (with format variations)...")
         step2_start = time.time()
         
         # Store search result data before matching
@@ -197,13 +253,15 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
             if search_product_data:
                 break
         
-        variant_url = find_matching_variant(
+        # Use smart matching with fuzzy=True
+        match_result = find_matching_variant(
             {"products": search_data.get("results", [])},
-            model_number
+            model_number,
+            fuzzy=True
         )
         step2_time = time.time() - step2_start
         
-        if not variant_url:
+        if not match_result:
             # Return available variants for debugging
             available_variants = []
             for product in search_data.get("results", []):
@@ -216,13 +274,15 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
                     "error": "Variant not found",
                     "requested_model": model_number,
                     "available_models": available_variants,
-                    "hint": "Model number must match exactly (case-insensitive)",
+                    "hint": "No match found even with format variations (K- prefix, hyphens, etc.)",
                     "total_products_found": len(search_data.get("results", [])),
                     "total_variants_found": len(available_variants)
                 }
             )
         
-        print(f"Step 2: ✓ Found variant URL ({step2_time:.2f}s)")
+        # Unpack the result tuple
+        variant_url, matched_model, match_type = match_result
+        print(f"Step 2: ✓ Matched '{model_number}' → '{matched_model}' ({match_type} match, {step2_time:.2f}s)")
         
         # STEP 3: Get complete product details
         print(f"Step 3: Fetching complete product attributes...")
@@ -256,6 +316,8 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
         return {
             "success": True,
             "model_number": model_number,
+            "matched_model": matched_model,
+            "match_type": match_type,
             "variant_url": variant_url,
             "product": {
                 # ========== BASIC INFORMATION (merged from both endpoints) ==========
