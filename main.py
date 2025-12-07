@@ -183,9 +183,20 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
         
         print(f"Step 1: ✓ Found {len(search_data.get('results', []))} products ({step1_time:.2f}s)")
         
-        # STEP 2: Find matching variant
+        # STEP 2: Find matching variant and preserve search data
         print(f"Step 2: Finding exact variant match for {model_number}...")
         step2_start = time.time()
+        
+        # Store search result data before matching
+        search_product_data = None
+        for product in search_data.get("results", []):
+            for variant in product.get("variants", []):
+                if variant.get("model_no", "").upper().strip() == model_number.upper().strip():
+                    search_product_data = product  # Store the parent product data
+                    break
+            if search_product_data:
+                break
+        
         variant_url = find_matching_variant(
             {"products": search_data.get("results", [])},
             model_number
@@ -238,7 +249,7 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
         
         print(f"Step 3: ✓ Retrieved complete product data ({step3_time:.2f}s)")
         
-        # Return COMPLETE product information - ALL fields from Unwrangle API
+        # Return COMPLETE product information - MERGE data from BOTH search and detail endpoints
         product_detail = detail_data.get("detail", {})
         overall_time = time.time() - overall_start
         
@@ -247,10 +258,11 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
             "model_number": model_number,
             "variant_url": variant_url,
             "product": {
-                # ========== BASIC INFORMATION ==========
-                "id": product_detail.get("id"),
-                "name": product_detail.get("name"),
-                "brand": product_detail.get("brand"),
+                # ========== BASIC INFORMATION (merged from both endpoints) ==========
+                "id": product_detail.get("id") or (search_product_data.get("id") if search_product_data else None),
+                "family_id": search_product_data.get("family_id") if search_product_data else None,  # ONLY in search
+                "name": product_detail.get("name") or (search_product_data.get("name") if search_product_data else None),
+                "brand": product_detail.get("brand") or (search_product_data.get("brand") if search_product_data else None),
                 "brand_url": product_detail.get("brand_url"),
                 "brand_logo": product_detail.get("brand_logo"),
                 "model_number": product_detail.get("model_number"),
@@ -258,27 +270,34 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
                 "product_type": product_detail.get("product_type"),
                 "application": product_detail.get("application"),
                 
-                # ========== PRICING & INVENTORY ==========
-                "price": product_detail.get("price"),
+                # ========== PRICING & INVENTORY (merged from both endpoints) ==========
+                "price": product_detail.get("price") or (search_product_data.get("price") if search_product_data else None),
+                "price_min": search_product_data.get("price_min") if search_product_data else None,  # ONLY in search
+                "price_max": search_product_data.get("price_max") if search_product_data else None,  # ONLY in search
+                "unit_price": search_product_data.get("unit_price") if search_product_data else None,  # ONLY in search
+                "price_type": search_product_data.get("price_type") if search_product_data else None,  # ONLY in search
                 "price_range": product_detail.get("price_range", {}),
-                "currency": product_detail.get("currency"),
+                "currency": product_detail.get("currency") or (search_product_data.get("currency") if search_product_data else None),
                 "base_type": product_detail.get("base_type"),
                 "shipping_fee": product_detail.get("shipping_fee"),
                 "has_free_installation": product_detail.get("has_free_installation"),
                 
-                # ========== INVENTORY & VARIANTS ==========
-                "variants": product_detail.get("variants", []),
-                "variant_count": product_detail.get("variant_count"),
+                # ========== INVENTORY & VARIANTS (merged from both endpoints) ==========
+                "variants": product_detail.get("variants", []) or (search_product_data.get("variants", []) if search_product_data else []),
+                "variant_count": product_detail.get("variant_count") or (search_product_data.get("variant_count") if search_product_data else None),
                 "has_variant_groups": product_detail.get("has_variant_groups"),
-                "has_in_stock_variants": product_detail.get("has_in_stock_variants"),
-                "all_variants_in_stock": product_detail.get("all_variants_in_stock"),
-                "total_inventory_quantity": product_detail.get("total_inventory_quantity"),
-                "in_stock_variant_count": product_detail.get("in_stock_variant_count"),
-                "is_configurable": product_detail.get("is_configurable"),
+                "has_in_stock_variants": product_detail.get("has_in_stock_variants") or (search_product_data.get("has_in_stock_variants") if search_product_data else None),
+                "all_variants_in_stock": product_detail.get("all_variants_in_stock") or (search_product_data.get("all_variants_in_stock") if search_product_data else None),
+                "all_variants_restricted": search_product_data.get("all_variants_restricted") if search_product_data else None,  # ONLY in search
+                "total_inventory_quantity": product_detail.get("total_inventory_quantity") or (search_product_data.get("total_inventory_quantity") if search_product_data else None),
+                "in_stock_variant_count": product_detail.get("in_stock_variant_count") or (search_product_data.get("in_stock_variant_count") if search_product_data else None),
+                "is_configurable": product_detail.get("is_configurable") or (search_product_data.get("is_configurable") if search_product_data else None),
+                "is_square_footage_based": search_product_data.get("is_square_footage_based") if search_product_data else None,  # ONLY in search
                 "configuration_type": product_detail.get("configuration_type"),
                 
-                # ========== IMAGES & VIDEOS ==========
-                "images": product_detail.get("images", []),
+                # ========== IMAGES & VIDEOS (merged from both endpoints) ==========
+                "images": product_detail.get("images", []) or (search_product_data.get("images", []) if search_product_data else []),
+                "thumbnail": product_detail.get("thumbnail") or (search_product_data.get("thumbnail") if search_product_data else None),
                 "videos": product_detail.get("videos", []),
                 
                 # ========== PRODUCT DETAILS ==========
@@ -312,14 +331,22 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
                 "business_category": product_detail.get("business_category"),
                 "related_categories": product_detail.get("related_categories", []),
                 
-                # ========== REVIEWS & RATINGS ==========
-                "rating": product_detail.get("rating"),
+                # ========== REVIEWS & RATINGS (merged from both endpoints) ==========
+                "rating": product_detail.get("rating") or (search_product_data.get("rating") if search_product_data else None),
+                "total_ratings": search_product_data.get("total_ratings") if search_product_data else None,  # ONLY in search (same as total_reviews)
                 "review_count": product_detail.get("review_count"),
-                "total_reviews": product_detail.get("total_reviews"),
+                "total_reviews": product_detail.get("total_reviews") or (search_product_data.get("total_ratings") if search_product_data else None),
                 "questions_count": product_detail.get("questions_count"),
                 
-                # ========== COLLECTION ==========
-                "collection": product_detail.get("collection"),
+                # ========== COLLECTION (merged from both endpoints) ==========
+                "collection": product_detail.get("collection") or (search_product_data.get("collection") if search_product_data else None),
+                
+                # ========== SHIPPING INFO (from search) ==========
+                "is_quick_ship": search_product_data.get("is_quick_ship") if search_product_data else None,  # ONLY in search
+                "shipping_info": search_product_data.get("shipping_info") if search_product_data else None,  # ONLY in search (different from detail)
+                
+                # ========== SPECIAL FLAGS (from search) ==========
+                "is_appointment_only_brand": search_product_data.get("is_appointment_only_brand") if search_product_data else None,  # ONLY in search
                 
                 # ========== RELATED PRODUCTS & OPTIONS ==========
                 "has_recommended_options": product_detail.get("has_recommended_options"),
@@ -343,9 +370,11 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
                 "step3_detail_time": f"{step3_time:.2f}s",
                 "total_time": f"{overall_time:.2f}s"
             },
+            "search_meta_data": search_data.get("meta_data", {}),  # Ferguson search engine info
             "metadata": {
                 "timestamp": datetime.utcnow().isoformat(),
-                "api_version": "ferguson_complete_v1"
+                "api_version": "ferguson_complete_v1",
+                "data_sources": "merged_search_and_detail"
             }
         }
         
