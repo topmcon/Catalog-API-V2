@@ -1,7 +1,26 @@
+# Python
 __pycache__/
 *.py[cod]
-.env
-.vscode/
-*.log
-__pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.env
+.venv
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

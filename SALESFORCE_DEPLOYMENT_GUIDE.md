@@ -256,19 +256,19 @@ The new API (port 8001) offers a superior `/lookup-ferguson-complete` endpoint w
 - Simpler code (eliminate `parseVariant` method)
 
 **Implementation:**
-See `SALESFORCE_APEX_UPDATES.md` for detailed refactoring guide
+Contact development team for Phase 2 implementation guidance
 
 ---
 
 ## 📞 Support
 
 ### Code Issues
-- Review `SALESFORCE_APEX_UPDATES.md` for detailed technical documentation
 - Check Salesforce Debug Logs for detailed error traces
+- Review GitHub repository for updates
 
 ### API Issues
 - Contact Ferguson API support
-- Reference API documentation in repository: `QUICK_REFERENCE.md`
+- Reference API documentation: `QUICK_REFERENCE.md`
 
 ### Salesforce Deployment Issues
 - Consult Salesforce Help: https://help.salesforce.com
@@ -318,4 +318,4 @@ Unfortunately, Salesforce doesn't support automated rollback. You must:
 
 ---
 
-**Questions?** Refer to `SALESFORCE_APEX_UPDATES.md` for technical details or `FINAL_TEST_REPORT.md` for API testing results.
+**Questions?** Refer to `QUICK_REFERENCE.md` for API documentation or contact your development team.
