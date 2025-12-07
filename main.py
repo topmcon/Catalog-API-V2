@@ -238,7 +238,7 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
         
         print(f"Step 3: ✓ Retrieved complete product data ({step3_time:.2f}s)")
         
-        # Return complete product information
+        # Return COMPLETE product information - ALL fields from Unwrangle API
         product_detail = detail_data.get("detail", {})
         overall_time = time.time() - overall_start
         
@@ -247,48 +247,89 @@ async def lookup_ferguson_complete(request: FergusonCompleteLookupRequest, x_api
             "model_number": model_number,
             "variant_url": variant_url,
             "product": {
-                # Basic Information
+                # ========== BASIC INFORMATION ==========
+                "id": product_detail.get("id"),
                 "name": product_detail.get("name"),
                 "brand": product_detail.get("brand"),
-                "model": product_detail.get("model"),
-                "product_id": product_detail.get("product_id"),
+                "brand_url": product_detail.get("brand_url"),
+                "brand_logo": product_detail.get("brand_logo"),
+                "model_number": product_detail.get("model_number"),
                 "url": product_detail.get("url"),
+                "product_type": product_detail.get("product_type"),
+                "application": product_detail.get("application"),
                 
-                # Pricing
-                "pricing": product_detail.get("pricing", {}),
+                # ========== PRICING & INVENTORY ==========
+                "price": product_detail.get("price"),
+                "price_range": product_detail.get("price_range", {}),
+                "currency": product_detail.get("currency"),
+                "base_type": product_detail.get("base_type"),
+                "shipping_fee": product_detail.get("shipping_fee"),
+                "has_free_installation": product_detail.get("has_free_installation"),
                 
-                # Complete Specifications (THIS IS WHY WE CALL DETAIL!)
-                "specifications": product_detail.get("specifications", {}),
-                
-                # Features (THIS IS WHY WE CALL DETAIL!)
-                "features": product_detail.get("features", []),
-                
-                # Images
-                "images": product_detail.get("images", []),
-                "thumbnail": product_detail.get("thumbnail"),
-                
-                # Description and Warranty
-                "description": product_detail.get("description"),
-                "warranty": product_detail.get("warranty"),
-                
-                # Variants with inventory
+                # ========== INVENTORY & VARIANTS ==========
                 "variants": product_detail.get("variants", []),
+                "variant_count": product_detail.get("variant_count"),
+                "has_variant_groups": product_detail.get("has_variant_groups"),
+                "has_in_stock_variants": product_detail.get("has_in_stock_variants"),
+                "all_variants_in_stock": product_detail.get("all_variants_in_stock"),
+                "total_inventory_quantity": product_detail.get("total_inventory_quantity"),
+                "in_stock_variant_count": product_detail.get("in_stock_variant_count"),
+                "is_configurable": product_detail.get("is_configurable"),
+                "configuration_type": product_detail.get("configuration_type"),
                 
-                # Dimensions (THIS IS WHY WE CALL DETAIL!)
+                # ========== IMAGES & VIDEOS ==========
+                "images": product_detail.get("images", []),
+                "videos": product_detail.get("videos", []),
+                
+                # ========== PRODUCT DETAILS ==========
+                "description": product_detail.get("description"),
+                "is_discontinued": product_detail.get("is_discontinued"),
+                
+                # ========== SPECIFICATIONS (CRITICAL!) ==========
+                "specifications": product_detail.get("specifications", {}),
+                "feature_groups": product_detail.get("feature_groups", []),
                 "dimensions": product_detail.get("dimensions", {}),
+                "attribute_ids": product_detail.get("attribute_ids", []),
                 
-                # Resources (THIS IS WHY WE CALL DETAIL!)
+                # ========== IDENTIFIERS ==========
+                "upc": product_detail.get("upc"),
+                "barcode": product_detail.get("barcode"),
+                
+                # ========== CERTIFICATIONS & COMPLIANCE ==========
+                "certifications": product_detail.get("certifications", []),
+                "country_of_origin": product_detail.get("country_of_origin"),
+                
+                # ========== WARRANTY ==========
+                "warranty": product_detail.get("warranty"),
+                "manufacturer_warranty": product_detail.get("manufacturer_warranty"),
+                
+                # ========== RESOURCES & DOCUMENTATION ==========
                 "resources": product_detail.get("resources", []),
                 
-                # Reviews
-                "reviews": product_detail.get("reviews", {}),
-                
-                # Categories
+                # ========== CATEGORIES ==========
                 "categories": product_detail.get("categories", []),
-                "breadcrumbs": product_detail.get("breadcrumbs", []),
+                "base_category": product_detail.get("base_category"),
+                "business_category": product_detail.get("business_category"),
+                "related_categories": product_detail.get("related_categories", []),
                 
-                # Collection
-                "collection": product_detail.get("collection")
+                # ========== REVIEWS & RATINGS ==========
+                "rating": product_detail.get("rating"),
+                "review_count": product_detail.get("review_count"),
+                "total_reviews": product_detail.get("total_reviews"),
+                "questions_count": product_detail.get("questions_count"),
+                
+                # ========== COLLECTION ==========
+                "collection": product_detail.get("collection"),
+                
+                # ========== RELATED PRODUCTS & OPTIONS ==========
+                "has_recommended_options": product_detail.get("has_recommended_options"),
+                "recommended_options": product_detail.get("recommended_options", []),
+                "has_accessories": product_detail.get("has_accessories"),
+                "has_replacement_parts": product_detail.get("has_replacement_parts"),
+                "replacement_parts_url": product_detail.get("replacement_parts_url"),
+                
+                # ========== SPECIAL FLAGS ==========
+                "is_by_appointment_only": product_detail.get("is_by_appointment_only")
             },
             "credits_used": 20,
             "steps_completed": {
